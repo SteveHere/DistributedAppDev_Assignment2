@@ -51,12 +51,10 @@ public class SharedImplementation extends UnicastRemoteObject implements SharedI
 		}
 	}
 	
-	@Override
 	public boolean agentAlreadyLoggedIn(String username) throws RemoteException {
 		return Server.agentThreads.containsKey(username);
 	}
 
-	@Override
 	public boolean isCustomerNameTaken(String username) throws RemoteException {
 		return Server.customerThreads.containsKey(username);
 	}

@@ -2,19 +2,16 @@ package agentClient;
 
 import java.awt.BorderLayout;
 import java.awt.GridLayout;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
+import java.io.*;
+import java.net.*;
+import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JPasswordField;
-import javax.swing.JTextField;
-import javax.swing.SwingConstants;
+import javax.sound.sampled.*;
+import javax.swing.*;
+
+import common.AudioFormatAndBufferSize;
 import common.Pair;
 import common.SharedInterface;
 import javafx.application.Application;
@@ -103,7 +100,7 @@ public class AgentClient extends Application {
 					String response = fromServer.readLine();
 					if(response.equals("Login successful")){
 						username = new String(input.getLeft());
-						stage.setTitle("CVT Agent Client - User: " + username);
+						stage.setTitle("CVT Agent Client - User: "/* + username*/);
 						stage.setScene(getAgentApplicationScene());
 						stage.setResizable(false);
 						
@@ -133,7 +130,7 @@ public class AgentClient extends Application {
 						System.exit(0);
 					}
 				}
-				
+				//rmiObject.removeAgentMulticastAddress(username);
 				fromServer.close();
 				toServer.close();
 				socket.close();
@@ -208,12 +205,31 @@ public class AgentClient extends Application {
 		
 		HBox quitHBox = new HBox(quit);
 		
+		Button startVoiceChatCust1 = new Button("Start voice chat"),
+				stopVoiceChatCust1 = new Button("Stop voice chat ");
+		
+		HBox voiceChatCust1 = new HBox(5, startVoiceChatCust1, stopVoiceChatCust1);
+		
+		Button startVoiceChatCust2 = new Button("Start voice chat"),
+				stopVoiceChatCust2 = new Button("Stop voice chat");
+		
+		HBox voiceChatCust2 = new HBox(5, startVoiceChatCust2, stopVoiceChatCust2);
+		
+		Button startVoiceChatBoth = new Button("Start voice chat with both"),
+				stopVoiceChatBoth = new Button("Stop voice chat with both");
+		
+		HBox voiceChatBoth = new HBox(5, startVoiceChatBoth, stopVoiceChatBoth);
+		
 		//Styling of components
 		quitHBox.setAlignment(Pos.CENTER);
 		
 		customer1Dialog.setMinHeight(400);
+		customer1Dialog.setMaxWidth(295);
+		customer1Dialog.setWrapText(true);
 		customer1Dialog.setEditable(false);
 		customer2Dialog.setMinHeight(400);
+		customer2Dialog.setMaxWidth(295);
+		customer2Dialog.setWrapText(true);
 		customer2Dialog.setEditable(false);
 		
 		
@@ -234,6 +250,15 @@ public class AgentClient extends Application {
 		sendToBoth.setMinWidth(120);
 		
 		quit.setMinWidth(100);
+		
+		voiceChatCust1.setDisable(true);
+		voiceChatCust1.setAlignment(Pos.CENTER);
+		
+		voiceChatCust2.setDisable(true);
+		voiceChatCust2.setAlignment(Pos.CENTER);
+		
+		voiceChatBoth.setDisable(true);
+		voiceChatBoth.setAlignment(Pos.CENTER);
 		
 		//Event handling
 		sendToCustomer1.setOnMouseClicked(e -> {
@@ -278,91 +303,70 @@ public class AgentClient extends Application {
 		});
 		
 		customer1Dialog.textProperty().addListener((obs, old, niu)->{
-			String[] dialog1 = customer1Dialog.getText().split("\n");
-			String[] dialog2 = customer2Dialog.getText().split("\n");
-			if(dialog1.length > 0 && dialog2.length > 0){
-				String[] lastLine1 = dialog1[dialog1.length - 1].split(": ", 2);
-				String[] lastLine2 = dialog2[dialog2.length - 1].split(": ", 2);
-				if(lastLine1.length == 2 && lastLine2.length == 2){
-					if(lastLine1[1].equals(lastLine2[1]) && !lastLine1[0].equals(username) 
-							&& !lastLine2[0].equals(username)){
-						bothCustomersInput.setDisable(false);
-						customer1Input.setDisable(true);
-						customer2Input.setDisable(true);
-					}
-					else{
-						bothCustomersInput.setDisable(true);
-						if(customer1 != null){
-							customer1Input.setDisable(false);
-						}
-						if(customer2 != null){
-							customer2Input.setDisable(false);
-						}
-					}
-				}
-				else{
-					bothCustomersInput.setDisable(true);
-					if(customer1 != null){
-						customer1Input.setDisable(false);
-					}
-					if(customer2 != null){
-						customer2Input.setDisable(false);
-					}
-				}
-			}
-			else{
-				bothCustomersInput.setDisable(true);
-				if(customer1 != null){
-					customer1Input.setDisable(false);
-				}
-				if(customer2 != null){
-					customer2Input.setDisable(false);
-				}
-			}
+			TextAreaListener();
 		});
 		
 		customer2Dialog.textProperty().addListener((obs, old, niu)->{
-			String[] dialog1 = customer1Dialog.getText().split("\n");
-			String[] dialog2 = customer2Dialog.getText().split("\n");
-			if(dialog1.length > 0 && dialog2.length > 0){
-				String[] lastLine1 = dialog1[dialog1.length - 1].split(": ", 2);
-				String[] lastLine2 = dialog2[dialog2.length - 1].split(": ", 2);
-				if(lastLine1.length == 2 && lastLine2.length == 2){
-					if(lastLine1[1].equals(lastLine2[1]) && !lastLine1[0].equals(username)
-							&& !lastLine2[0].equals(username)){
-						bothCustomersInput.setDisable(false);
-						customer1Input.setDisable(true);
-						customer2Input.setDisable(true);
-					}
-					else{
-						bothCustomersInput.setDisable(true);
-						if(customer1 != null){
-							customer1Input.setDisable(false);
-						}
-						if(customer2 != null){
-							customer2Input.setDisable(false);
-						}
-					}
-				}
-				else{
-					bothCustomersInput.setDisable(true);
-					if(customer1 != null){
-						customer1Input.setDisable(false);
-					}
-					if(customer2 != null){
-						customer2Input.setDisable(false);
-					}
-				}
+			TextAreaListener();
+		});
+		
+		startVoiceChatCust1.setOnAction(e -> {
+			startVoiceChatCust1.setDisable(true);
+			try {
+				captureAudio(rmiObject.getCustomerIPAddress(customer1));
+			} catch (RemoteException e1) {
+				JOptionPane.showMessageDialog(
+						null, 
+						"Exception encountered. Details: \n" + e1, 
+						"Exception encountered", 
+						JOptionPane.ERROR_MESSAGE
+						);
+				System.exit(1);
 			}
-			else{
-				bothCustomersInput.setDisable(true);
-				if(customer1 != null){
-					customer1Input.setDisable(false);
-				}
-				if(customer2 != null){
-					customer2Input.setDisable(false);
-				}
+			stopVoiceChatCust1.setDisable(false);
+		});
+		
+		startVoiceChatCust2.setOnAction(e -> {
+			startVoiceChatCust2.setDisable(true);
+			try {
+				captureAudio(rmiObject.getCustomerIPAddress(customer2));
+			} catch (RemoteException e1) {
+				JOptionPane.showMessageDialog(
+						null, 
+						"Exception encountered. Details: \n" + e1, 
+						"Exception encountered", 
+						JOptionPane.ERROR_MESSAGE
+						);
+				System.exit(1);
 			}
+			stopVoiceChatCust2.setDisable(false);
+		});
+		
+		startVoiceChatBoth.setOnAction(e -> {
+			startVoiceChatBoth.setDisable(true);
+			
+			stopVoiceChatBoth.setDisable(false);
+		});
+		
+		stopVoiceChatCust1.setOnMouseClicked(e -> {
+			stopVoiceChatCust1.setDisable(true);
+			stopAudioCapture = true;
+			targetDataLine.close();
+			startVoiceChatCust1.setDisable(false);
+		});
+		
+		stopVoiceChatCust2.setOnMouseClicked(e -> {
+			stopVoiceChatCust2.setDisable(true);
+			stopAudioCapture = true;
+			targetDataLine.close();
+			startVoiceChatCust2.setDisable(false);
+		});
+		
+		stopVoiceChatBoth.setOnMouseClicked(e -> {
+			stopVoiceChatCust2.setDisable(true);
+			stopAudioCapture = true;
+			targetDataLine.close();
+			startVoiceChatCust2.setDisable(false);
 		});
 		
 		//Positioning of components
@@ -381,7 +385,159 @@ public class AgentClient extends Application {
 		
 		result.add(bothCustomersInput, 0, 4, 3, 1);
 		
-		return new Scene(result, 600, 510);
+		result.add(voiceChatCust1, 0, 5);
+		result.add(voiceChatCust2, 2, 5);
+		
+		result.add(voiceChatBoth, 0, 6, 3, 1);
+		
+		return new Scene(result);
 	}
 
+	private void TextAreaListener(){
+		String[] dialog1 = customer1Dialog.getText().split("\n");
+		String[] dialog2 = customer2Dialog.getText().split("\n");
+		if(dialog1.length > 0 && dialog2.length > 0){
+			String[] lastLine1 = dialog1[dialog1.length - 1].split(": ", 2);
+			String[] lastLine2 = dialog2[dialog2.length - 1].split(": ", 2);
+			if(lastLine1.length == 2 && lastLine2.length == 2){
+				if(lastLine1[1].equals(lastLine2[1]) && !lastLine1[0].equals(username)
+						&& !lastLine2[0].equals(username)){
+					bothCustomersInput.setDisable(false);
+					customer1Input.setDisable(true);
+					customer2Input.setDisable(true);
+				}
+				else{
+					bothCustomersInput.setDisable(true);
+					if(customer1 != null){
+						customer1Input.setDisable(false);
+					}
+					if(customer2 != null){
+						customer2Input.setDisable(false);
+					}
+				}
+			}
+			else{
+				bothCustomersInput.setDisable(true);
+				if(customer1 != null){
+					customer1Input.setDisable(false);
+				}
+				if(customer2 != null){
+					customer2Input.setDisable(false);
+				}
+			}
+		}
+		else{
+			bothCustomersInput.setDisable(true);
+			if(customer1 != null){
+				customer1Input.setDisable(false);
+			}
+			if(customer2 != null){
+				customer2Input.setDisable(false);
+			}
+		}
+	}
+
+	ByteArrayOutputStream byteOutputStream;
+	TargetDataLine targetDataLine;
+	AudioInputStream InputStream;
+	SourceDataLine sourceLine;
+	public boolean stopAudioCapture = false;
+	
+	private void captureAudio(String customerIPAddress) {
+		try {
+	        AudioFormat adFormat = AudioFormatAndBufferSize.getAudioFormat();
+	        DataLine.Info dataLineInfo = new DataLine.Info(TargetDataLine.class, adFormat);
+	        targetDataLine = (TargetDataLine) AudioSystem.getLine(dataLineInfo);
+	        targetDataLine.open(adFormat);
+	        targetDataLine.start();
+	
+	        Thread captureThread = new CaptureThread(customerIPAddress);
+	        captureThread.start();
+	    } catch (Exception e) {
+	        System.err.println(e.getMessage());
+	        System.exit(0);
+	    }
+	}
+	
+	public void runVOIP() {
+	    try {
+	        @SuppressWarnings("resource")
+			DatagramSocket serverSocket = new DatagramSocket(9091);
+	        byte[] receiveData = new byte[AudioFormatAndBufferSize.bufferSize];
+	        while (true) {
+	            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+	            serverSocket.receive(receivePacket);
+	            try {
+	                byte audioData[] = receivePacket.getData();
+	                InputStream byteInputStream = new ByteArrayInputStream(audioData);
+	                AudioFormat adFormat = AudioFormatAndBufferSize.getAudioFormat();
+	                InputStream = new AudioInputStream(byteInputStream, adFormat, audioData.length / adFormat.getFrameSize());
+	                DataLine.Info dataLineInfo = new DataLine.Info(SourceDataLine.class, adFormat);
+	                sourceLine = (SourceDataLine) AudioSystem.getLine(dataLineInfo);
+	                sourceLine.open(adFormat);
+	                sourceLine.start();
+	                Thread playThread = new Thread(new PlayThread());
+	                playThread.start();
+	            } catch (Exception e) {
+	                System.out.println(e);
+	                System.exit(0);
+	            }
+	        }
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	    }
+	}
+	
+	public class CaptureThread extends Thread {
+		private String IPAddress;
+		private byte tempBuffer[] = new byte[AudioFormatAndBufferSize.bufferSize];
+		
+		public CaptureThread(String IPAddress) {
+			super();
+			this.IPAddress = IPAddress;
+		}
+
+		@Override
+		public void run() {
+			ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+	        stopAudioCapture = false;
+	        try {
+	            DatagramSocket clientSocket = new DatagramSocket(9090);
+	            InetAddress IPAddress = InetAddress.getByName(this.IPAddress);
+	            while (!stopAudioCapture) {
+	                int cnt = targetDataLine.read(tempBuffer, 0, tempBuffer.length);
+	                if (cnt > 0) {
+	                    DatagramPacket sendPacket = new DatagramPacket(tempBuffer, tempBuffer.length, IPAddress, 9091);
+	                    clientSocket.send(sendPacket);
+	                    byteOutputStream.write(tempBuffer, 0, cnt);
+	                }
+	            }
+	            byteOutputStream.close();
+	            clientSocket.close();
+	        } catch (Exception e) {
+	            System.out.println("CaptureThread::run()" + e);
+	            System.exit(0);
+	        }
+		}
+	}
+	
+	class PlayThread extends Thread {	
+	    byte tempBuffer[] = new byte[AudioFormatAndBufferSize.bufferSize];
+	
+	    public void run() {
+	        try {
+	            int cnt;
+	            while ((cnt = InputStream.read(tempBuffer, 0, tempBuffer.length)) != -1) {
+	                if (cnt > 0) {
+	                    sourceLine.write(tempBuffer, 0, cnt);
+	                }
+	            }
+	        } catch (Exception e) {
+	            System.out.println(e);
+	            System.exit(0);
+	        }
+	    }
+	}
+	
+	
 }

@@ -1,27 +1,27 @@
 package customerClient;
 
 import java.awt.BorderLayout;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
+import java.io.*;
+import java.net.*;
+import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
+import javax.sound.sampled.*;
+import javax.swing.*;
 
+import common.AudioFormatAndBufferSize;
 import common.SharedInterface;
 import javafx.application.Application;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 
 public class CustomerClient extends Application {
@@ -175,6 +175,11 @@ public class CustomerClient extends Application {
 		
 		send = new Button("Send");
 		
+		Button startVoiceChat = new Button("Start Voice Chat"),
+				stopVoiceChat = new Button("Stop Voice Chat");
+		
+		HBox VoiceChatHBox = new HBox(5, startVoiceChat, stopVoiceChat);
+		
 		//Styling of components
 		clientTextArea.setMinHeight(390);
 		clientTextArea.setMinWidth(440);
@@ -187,6 +192,10 @@ public class CustomerClient extends Application {
 		
 		send.setMinWidth(55);
 		send.setDisable(true);
+		
+		stopVoiceChat.setDisable(true);
+		
+		VoiceChatHBox.setAlignment(Pos.CENTER);
 		
 		//Event handling
 		send.setOnMouseClicked(e -> {
@@ -205,14 +214,140 @@ public class CustomerClient extends Application {
 			wantsToQuit = true;
 		});
 		
+		startVoiceChat.setOnMouseClicked(e -> {
+			startVoiceChat.setDisable(true);
+			try {
+				captureAudio(rmiObject.getAgentIPAddress(agent));
+			} catch (RemoteException e1) {
+				JOptionPane.showMessageDialog(
+						null, 
+						"Exception encountered. Details: \n" + e1, 
+						"Exception encountered", 
+						JOptionPane.ERROR_MESSAGE
+						);
+				System.exit(1);
+			}
+			stopVoiceChat.setDisable(false);
+		});
+		
+		stopVoiceChat.setOnMouseClicked(e -> {
+			stopVoiceChat.setDisable(true);
+			stopAudioCapture = true;
+			targetDataLine.close();
+			startVoiceChat.setDisable(false);
+		});
+		
 		//Positioning of components
 		result.add(agentName, 0, 0);
 		result.add(quit, 1, 0);
 		result.add(clientTextArea, 0, 1, 2, 1);
 		result.add(clientText, 0, 2);
 		result.add(send, 1, 2);
+		result.add(VoiceChatHBox, 0, 3, 2, 1);
 		
 		return new Scene(result);
+	}
+	
+	ByteArrayOutputStream byteOutputStream;
+	TargetDataLine targetDataLine;
+	AudioInputStream InputStream;
+	SourceDataLine sourceLine;
+	public boolean stopAudioCapture = false;
+	
+	private void captureAudio(String customerIPAddress) {
+		try {
+	        AudioFormat adFormat = AudioFormatAndBufferSize.getAudioFormat();
+	        DataLine.Info dataLineInfo = new DataLine.Info(TargetDataLine.class, adFormat);
+	        targetDataLine = (TargetDataLine) AudioSystem.getLine(dataLineInfo);
+	        targetDataLine.open(adFormat);
+	        targetDataLine.start();
+	
+	        Thread captureThread = new CaptureThread(customerIPAddress);
+	        captureThread.start();
+	    } catch (Exception e) {
+	        System.err.println(e.getMessage());
+	        System.exit(0);
+	    }
+	}
+	
+	public void runVOIP() {
+	    try {
+	        @SuppressWarnings("resource")
+			DatagramSocket serverSocket = new DatagramSocket(9091);
+	        byte[] receiveData = new byte[AudioFormatAndBufferSize.bufferSize];
+	        while (true) {
+	            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+	            serverSocket.receive(receivePacket);
+	            try {
+	                byte audioData[] = receivePacket.getData();
+	                InputStream byteInputStream = new ByteArrayInputStream(audioData);
+	                AudioFormat adFormat = AudioFormatAndBufferSize.getAudioFormat();
+	                InputStream = new AudioInputStream(byteInputStream, adFormat, audioData.length / adFormat.getFrameSize());
+	                DataLine.Info dataLineInfo = new DataLine.Info(SourceDataLine.class, adFormat);
+	                sourceLine = (SourceDataLine) AudioSystem.getLine(dataLineInfo);
+	                sourceLine.open(adFormat);
+	                sourceLine.start();
+	                Thread playThread = new Thread(new PlayThread());
+	                playThread.start();
+	            } catch (Exception e) {
+	                System.out.println(e);
+	                System.exit(0);
+	            }
+	        }
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	    }
+	}
+	
+	public class CaptureThread extends Thread {
+		private String IPAddress;
+		private byte tempBuffer[] = new byte[AudioFormatAndBufferSize.bufferSize];
+		
+		public CaptureThread(String IPAddress) {
+			super();
+			this.IPAddress = IPAddress;
+		}
+
+		@Override
+		public void run() {
+			ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+	        stopAudioCapture = false;
+	        try {
+	            DatagramSocket clientSocket = new DatagramSocket(9090);
+	            InetAddress IPAddress = InetAddress.getByName(this.IPAddress);
+	            while (!stopAudioCapture) {
+	                int cnt = targetDataLine.read(tempBuffer, 0, tempBuffer.length);
+	                if (cnt > 0) {
+	                    DatagramPacket sendPacket = new DatagramPacket(tempBuffer, tempBuffer.length, IPAddress, 9091);
+	                    clientSocket.send(sendPacket);
+	                    byteOutputStream.write(tempBuffer, 0, cnt);
+	                }
+	            }
+	            byteOutputStream.close();
+	            clientSocket.close();
+	        } catch (Exception e) {
+	            System.out.println("CaptureThread::run()" + e);
+	            System.exit(0);
+	        }
+		}
+	}
+	
+	class PlayThread extends Thread {	
+	    byte tempBuffer[] = new byte[AudioFormatAndBufferSize.bufferSize];
+	
+	    public void run() {
+	        try {
+	            int cnt;
+	            while ((cnt = InputStream.read(tempBuffer, 0, tempBuffer.length)) != -1) {
+	                if (cnt > 0) {
+	                    sourceLine.write(tempBuffer, 0, cnt);
+	                }
+	            }
+	        } catch (Exception e) {
+	            System.out.println(e);
+	            System.exit(0);
+	        }
+	    }
 	}
 
 }

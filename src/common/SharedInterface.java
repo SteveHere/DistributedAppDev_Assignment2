@@ -10,10 +10,6 @@ public interface SharedInterface extends Remote {
 	
 	public long customerAuth(String username) throws RemoteException;
 	
-	public boolean agentAlreadyLoggedIn(String username) throws RemoteException;
-
-	public boolean isCustomerNameTaken(String username) throws RemoteException;
-	
 	public String getAgentIPAddress(String agent) throws RemoteException;
 	
 	public String getCustomerIPAddress(String customer) throws RemoteException;
