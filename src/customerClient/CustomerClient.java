@@ -5,11 +5,15 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+
+import common.SharedInterface;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
@@ -22,6 +26,7 @@ import javafx.stage.Stage;
 
 public class CustomerClient extends Application {
 
+	static SharedInterface rmiObject;
 	static Socket socket;
 	static BufferedReader fromServer;
 	static PrintWriter toServer;
@@ -68,6 +73,8 @@ public class CustomerClient extends Application {
 				System.exit(0);
 			}
 			else{
+				Registry registry = LocateRegistry.getRegistry(serverAddress);
+				rmiObject = (SharedInterface) registry.lookup("sharedObject");
 				socket = new Socket(serverAddress, 9090);
 
 				// Receiving or reading data from the socket
@@ -77,25 +84,36 @@ public class CustomerClient extends Application {
 				String initialResponse = fromServer.readLine();
 				
 				//Main logic only starts when the server sends back "Login Authentication Required."
-				if(initialResponse.equals("Client request required")){						
-					toServer.println("Customer~" + input); 
+				if(initialResponse.equals("Client authentication required")){
+					long token = rmiObject.customerAuth(input);
+					if(token != -1){
+						toServer.println("Customer~" + token); 
 
-					String response = fromServer.readLine();
-					if(response.equals("Connection established")){
-						username = new String(input);
-						stage.setTitle("CVT Customer Client - User: " + username);
-						stage.setScene(getCustomerApplicationScene());
-						stage.setResizable(false);
-						
-						CustomerThread thread = new CustomerThread();
-						thread.start();
-						
-						stage.showAndWait();
-						if(CustomerClient.wantsToQuit == false){
-							toServer.println("Force quit");
+						String response = fromServer.readLine();
+						if(response.equals("Connection established")){
+							username = new String(input);
+							stage.setTitle("CVT Customer Client - User: " + username);
+							stage.setScene(getCustomerApplicationScene());
+							stage.setResizable(false);
+							
+							CustomerThread thread = new CustomerThread();
+							thread.start();
+							
+							stage.showAndWait();
+							if(CustomerClient.wantsToQuit == false){
+								toServer.println("Force quit");
+							}
+						}
+						else{
+							JOptionPane.showMessageDialog(null, 
+									"User has not yet authenticated. Exiting program.", 
+									"User Not Yet Authenticated", 
+									JOptionPane.INFORMATION_MESSAGE
+									);
+							System.exit(0);
 						}
 					}
-					else if(response.equals("Username already taken")){
+					else{
 						JOptionPane.showMessageDialog(null, 
 								"Username has already been taken. Exiting program.", 
 								"Username Already Taken", 
@@ -194,7 +212,7 @@ public class CustomerClient extends Application {
 		result.add(clientText, 0, 2);
 		result.add(send, 1, 2);
 		
-		return new Scene(result, 480, 450);
+		return new Scene(result);
 	}
 
 }

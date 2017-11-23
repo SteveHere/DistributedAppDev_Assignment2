@@ -16,6 +16,7 @@ public class RequestHandler extends Thread {
 	private PrintWriter toClient;
 	private BufferedReader fromClient;
 	private String username;
+	private String IPAddress;
 	
 	//This is only used by customers
 	private PrintWriter transcript;
@@ -23,10 +24,14 @@ public class RequestHandler extends Thread {
 	public RequestHandler(Socket clientSocket) {
 		this.clientSocket = clientSocket;
 	}
+	
+	public String getIPAddress(){
+		return IPAddress;
+	}
 
 	@Override
 	public void run() {
-		String clientSocketAddress = clientSocket.getInetAddress().toString();
+		IPAddress = clientSocket.getInetAddress().getHostAddress();
 		
 		try{
 	    	//Set up readers and writers
@@ -34,52 +39,49 @@ public class RequestHandler extends Thread {
 			fromClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 			
 			Server.logFile.println((System.currentTimeMillis() / 1000L) 
-					+ " Client from " + clientSocketAddress + " connected");
+					+ " Client from " + IPAddress + " connected");
 			Server.logFile.flush();
 			
 			//Send first request from server to client requesting details and logininfo
-			toClient.println("Client request required");
+			toClient.println("Client authentication required");
 			String[] clientResponse = fromClient.readLine().split("~");
 			
-			//The response must be in either 2 or 3 parts; 2 for customer, 3 for agent
-			//Customer format: Customer~<username>
-			if(clientResponse.length == 2 && clientResponse[0].equals("Customer")){
-				//For the customer, first off, check if the username already exists
-				//If it does, disconnect from the connection and print that the username's taken
-				if(isCustomerUsernameTaken(clientResponse[1])){
-					toClient.println("Username already taken");
+			//The response must be in either 2 parts: (Customer|Agent)~<Token>
+			if(clientResponse.length == 2){
+				long token = new Long(clientResponse[1]);
+				//The client must have authenticated beforehand
+				if(clientResponse[0].equals("Customer")){
+					if(Server.customerLoginMapping.containsKey(token)){
+						username = Server.customerLoginMapping.get(token);
+						Server.customerThreads.put(username, this);
+						Server.customerLoginMapping.remove(token);
+						toClient.println("Connection established");
+						startCustomerConnection();
+					}
+					else{
+						toClient.println("Client has not yet authenticated");
+					}
 				}
-				//If not, add to the map of customer connections
+				else if(clientResponse[0].equals("Agent")){
+					if(Server.agentLoginMapping.containsKey(token)){
+						username = Server.agentLoginMapping.get(token);
+						Server.agentThreads.put(username, this);
+						Server.agentLoginMapping.remove(token);
+						Server.agentToCustomer.put(username, new Pair<String, String>(null, null));
+						toClient.println("Login successful");
+						startAgentConnection();
+					}
+					else{
+						toClient.println("Client has not yet authenticated");
+					}	
+				}
 				else{
-					toClient.println("Connection established");
-					Server.customerThreads.put(clientResponse[1], this);
-					username = clientResponse[1];
-					startCustomerConnection();
+					toClient.println("Client has sent incorrect format");
 				}
 			}
-			//Agent format: Agent~<username>~<password>
-			else if(clientResponse.length == 3 && clientResponse[0].equals("Agent")){
-				//For the agent, first off, check if the connection already exists
-				//If it does, print that the agent's already logged in
-				if(isAgentLoggedIn(clientResponse[1])){
-					toClient.println("Agent has already logged in");
-				}
-				//If not, then try to log the agent in, if failed, send failed login attempt
-				else if(logInAgent(clientResponse[1], clientResponse[2]) == false){
-					toClient.println("Incorrect login details");
-				}
-				//If succeeded in logging in, add the user to the map of agent connections
-				else{
-					toClient.println("Login successful");
-					Server.agentThreads.put(clientResponse[1], this);
-					Server.agentToCustomer.put(clientResponse[1], new Pair<String, String>(null, null));
-					username = clientResponse[1];
-					startAgentConnection();
-				}
-			}
-			//If its not neither, print out a format error message to the client
+			//If its not neither, print out an authentication error message to the client
 			else{
-				toClient.println("Incorrect format from client response");
+				toClient.println("Client has sent incorrect format");
 			}
 			toClient.close();
 			fromClient.close();
@@ -87,12 +89,12 @@ public class RequestHandler extends Thread {
 		} catch (IOException | InterruptedException e) {
 			Server.logFile.println((System.currentTimeMillis() / 1000L) 
 					+ ": Exception occured while connecting with "
-					+ clientSocketAddress + "\n" 
+					+ IPAddress + "\n" 
 					+ e.toString());
 		}
 		
 		Server.logFile.println((System.currentTimeMillis() / 1000L) 
-				+ " Client from " + clientSocketAddress + " disconnected");
+				+ " Client from " +IPAddress + " disconnected");
 		Server.logFile.flush();
 	}
 	
@@ -270,6 +272,7 @@ public class RequestHandler extends Thread {
 	//This method transfers messages from external calls to the connected client
 	public void transferMessage(String source, String message){
 		toClient.println(source + "~" + message);
+		
 	}
 	
 	//This method records the messages sent into the customer's transcript 
@@ -278,18 +281,5 @@ public class RequestHandler extends Thread {
 			transcript.println(string);		
 			transcript.flush();
 		}
-	}
-
-	private boolean isCustomerUsernameTaken(String username) {
-		return Server.customerThreads.containsKey(username);
-	}
-
-	private boolean isAgentLoggedIn(String username) {
-		return Server.agentThreads.containsKey(username);
-	}
-	
-	private boolean logInAgent(String username, String password) {
-		return Server.agentsLoginInfo.get(username) != null
-				&& Server.agentsLoginInfo.get(username).equals(password);
 	}
 }

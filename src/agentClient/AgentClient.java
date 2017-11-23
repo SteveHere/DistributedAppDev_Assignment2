@@ -6,6 +6,8 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -14,6 +16,7 @@ import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import common.Pair;
+import common.SharedInterface;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -27,8 +30,9 @@ import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 
 public class AgentClient extends Application {
-
-	Socket socket;
+	
+	static SharedInterface rmiObject;
+	static Socket socket;
 	static BufferedReader fromServer;
 	static PrintWriter toServer;
 	static String username;
@@ -81,6 +85,8 @@ public class AgentClient extends Application {
 				System.exit(0);
 			}
 			else{
+				Registry registry = LocateRegistry.getRegistry(serverAddress);
+				rmiObject = (SharedInterface) registry.lookup("sharedObject");
 				socket = new Socket(serverAddress, 9090);
 
 				// Receiving or reading data from the socket
@@ -90,8 +96,9 @@ public class AgentClient extends Application {
 				String initialResponse = fromServer.readLine();
 				
 				//Main logic only starts when the server sends back "Client request required"
-				if(initialResponse.equals("Client request required")){
-					toServer.println("Agent~" + input.getLeft() + "~" + input.getRight()); 
+				if(initialResponse.equals("Client authentication required")){
+					long token = rmiObject.agentAuth(input.getLeft(), input.getRight());
+					toServer.println("Agent~" + token); 
 
 					String response = fromServer.readLine();
 					if(response.equals("Login successful")){
