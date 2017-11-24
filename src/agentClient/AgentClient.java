@@ -32,6 +32,7 @@ public class AgentClient extends Application {
 	static Socket socket;
 	static BufferedReader fromServer;
 	static PrintWriter toServer;
+	static String multicastIPAddress;
 	static String username;
 	static String customer1;
 	static String customer2;
@@ -47,6 +48,9 @@ public class AgentClient extends Application {
 	static GridPane customer1Input;
 	static GridPane customer2Input;
 	static GridPane bothCustomersInput;
+	static HBox customer1VoiceChat;
+	static HBox customer2VoiceChat;
+	static HBox bothVoiceChat;
 	
 	@Override
 	public void start(Stage primaryStage){
@@ -100,10 +104,11 @@ public class AgentClient extends Application {
 					String response = fromServer.readLine();
 					if(response.equals("Login successful")){
 						username = new String(input.getLeft());
-						stage.setTitle("CVT Agent Client - User: "/* + username*/);
+						stage.setTitle("CVT Agent Client - User: " + username);
 						stage.setScene(getAgentApplicationScene());
 						stage.setResizable(false);
-						
+						VOIPThread voip = new VOIPThread();
+						voip.start();
 						AgentThread thread = new AgentThread();
 						thread.start();
 						
@@ -130,7 +135,9 @@ public class AgentClient extends Application {
 						System.exit(0);
 					}
 				}
-				//rmiObject.removeAgentMulticastAddress(username);
+				rmiObject.removeAgentMulticastAddress(username);
+				stopAudioCapture = true;
+				targetDataLine.close();
 				fromServer.close();
 				toServer.close();
 				socket.close();
@@ -208,17 +215,17 @@ public class AgentClient extends Application {
 		Button startVoiceChatCust1 = new Button("Start voice chat"),
 				stopVoiceChatCust1 = new Button("Stop voice chat ");
 		
-		HBox voiceChatCust1 = new HBox(5, startVoiceChatCust1, stopVoiceChatCust1);
+		customer1VoiceChat = new HBox(5, startVoiceChatCust1, stopVoiceChatCust1);
 		
 		Button startVoiceChatCust2 = new Button("Start voice chat"),
 				stopVoiceChatCust2 = new Button("Stop voice chat");
 		
-		HBox voiceChatCust2 = new HBox(5, startVoiceChatCust2, stopVoiceChatCust2);
+		customer2VoiceChat = new HBox(5, startVoiceChatCust2, stopVoiceChatCust2);
 		
 		Button startVoiceChatBoth = new Button("Start voice chat with both"),
 				stopVoiceChatBoth = new Button("Stop voice chat with both");
 		
-		HBox voiceChatBoth = new HBox(5, startVoiceChatBoth, stopVoiceChatBoth);
+		bothVoiceChat = new HBox(5, startVoiceChatBoth, stopVoiceChatBoth);
 		
 		//Styling of components
 		quitHBox.setAlignment(Pos.CENTER);
@@ -251,14 +258,17 @@ public class AgentClient extends Application {
 		
 		quit.setMinWidth(100);
 		
-		voiceChatCust1.setDisable(true);
-		voiceChatCust1.setAlignment(Pos.CENTER);
+		stopVoiceChatCust1.setDisable(true);
+		customer1VoiceChat.setDisable(true);
+		customer1VoiceChat.setAlignment(Pos.CENTER);
 		
-		voiceChatCust2.setDisable(true);
-		voiceChatCust2.setAlignment(Pos.CENTER);
+		stopVoiceChatCust2.setDisable(true);
+		customer2VoiceChat.setDisable(true);
+		customer2VoiceChat.setAlignment(Pos.CENTER);
 		
-		voiceChatBoth.setDisable(true);
-		voiceChatBoth.setAlignment(Pos.CENTER);
+		stopVoiceChatBoth.setDisable(true);
+		bothVoiceChat.setDisable(true);
+		bothVoiceChat.setAlignment(Pos.CENTER);
 		
 		//Event handling
 		sendToCustomer1.setOnMouseClicked(e -> {
@@ -344,7 +354,7 @@ public class AgentClient extends Application {
 		
 		startVoiceChatBoth.setOnAction(e -> {
 			startVoiceChatBoth.setDisable(true);
-			
+			captureMulticastAudio(multicastIPAddress);
 			stopVoiceChatBoth.setDisable(false);
 		});
 		
@@ -363,10 +373,10 @@ public class AgentClient extends Application {
 		});
 		
 		stopVoiceChatBoth.setOnMouseClicked(e -> {
-			stopVoiceChatCust2.setDisable(true);
+			stopVoiceChatBoth.setDisable(true);
 			stopAudioCapture = true;
 			targetDataLine.close();
-			startVoiceChatCust2.setDisable(false);
+			startVoiceChatBoth.setDisable(false);
 		});
 		
 		//Positioning of components
@@ -385,10 +395,10 @@ public class AgentClient extends Application {
 		
 		result.add(bothCustomersInput, 0, 4, 3, 1);
 		
-		result.add(voiceChatCust1, 0, 5);
-		result.add(voiceChatCust2, 2, 5);
+		result.add(customer1VoiceChat, 0, 5);
+		result.add(customer2VoiceChat, 2, 5);
 		
-		result.add(voiceChatBoth, 0, 6, 3, 1);
+		result.add(bothVoiceChat, 0, 6, 3, 1);
 		
 		return new Scene(result);
 	}
@@ -439,8 +449,6 @@ public class AgentClient extends Application {
 
 	ByteArrayOutputStream byteOutputStream;
 	TargetDataLine targetDataLine;
-	AudioInputStream InputStream;
-	SourceDataLine sourceLine;
 	public boolean stopAudioCapture = false;
 	
 	private void captureAudio(String customerIPAddress) {
@@ -451,7 +459,7 @@ public class AgentClient extends Application {
 	        targetDataLine.open(adFormat);
 	        targetDataLine.start();
 	
-	        Thread captureThread = new CaptureThread(customerIPAddress);
+	        Thread captureThread = new UnicastCaptureThread(customerIPAddress);
 	        captureThread.start();
 	    } catch (Exception e) {
 	        System.err.println(e.getMessage());
@@ -459,57 +467,42 @@ public class AgentClient extends Application {
 	    }
 	}
 	
-	public void runVOIP() {
-	    try {
-	        @SuppressWarnings("resource")
-			DatagramSocket serverSocket = new DatagramSocket(9091);
-	        byte[] receiveData = new byte[AudioFormatAndBufferSize.bufferSize];
-	        while (true) {
-	            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-	            serverSocket.receive(receivePacket);
-	            try {
-	                byte audioData[] = receivePacket.getData();
-	                InputStream byteInputStream = new ByteArrayInputStream(audioData);
-	                AudioFormat adFormat = AudioFormatAndBufferSize.getAudioFormat();
-	                InputStream = new AudioInputStream(byteInputStream, adFormat, audioData.length / adFormat.getFrameSize());
-	                DataLine.Info dataLineInfo = new DataLine.Info(SourceDataLine.class, adFormat);
-	                sourceLine = (SourceDataLine) AudioSystem.getLine(dataLineInfo);
-	                sourceLine.open(adFormat);
-	                sourceLine.start();
-	                Thread playThread = new Thread(new PlayThread());
-	                playThread.start();
-	            } catch (Exception e) {
-	                System.out.println(e);
-	                System.exit(0);
-	            }
-	        }
+	private void captureMulticastAudio(String customerIPAddress) {
+		try {
+	        AudioFormat adFormat = AudioFormatAndBufferSize.getAudioFormat();
+	        DataLine.Info dataLineInfo = new DataLine.Info(TargetDataLine.class, adFormat);
+	        targetDataLine = (TargetDataLine) AudioSystem.getLine(dataLineInfo);
+	        targetDataLine.open(adFormat);
+	        targetDataLine.start();
+	
+	        Thread captureThread = new MulticastCaptureThread(multicastIPAddress);
+	        captureThread.start();
 	    } catch (Exception e) {
-	        e.printStackTrace();
+	        System.err.println(e.getMessage());
+	        System.exit(0);
 	    }
 	}
 	
-	public class CaptureThread extends Thread {
+	public class UnicastCaptureThread extends Thread {
 		private String IPAddress;
 		private byte tempBuffer[] = new byte[AudioFormatAndBufferSize.bufferSize];
 		
-		public CaptureThread(String IPAddress) {
+		public UnicastCaptureThread(String IPAddress) {
 			super();
 			this.IPAddress = IPAddress;
 		}
 
 		@Override
 		public void run() {
-			ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
-	        stopAudioCapture = false;
+			stopAudioCapture = false;
 	        try {
-	            DatagramSocket clientSocket = new DatagramSocket(9090);
+	            DatagramSocket clientSocket = new DatagramSocket(10000);
 	            InetAddress IPAddress = InetAddress.getByName(this.IPAddress);
 	            while (!stopAudioCapture) {
 	                int cnt = targetDataLine.read(tempBuffer, 0, tempBuffer.length);
 	                if (cnt > 0) {
-	                    DatagramPacket sendPacket = new DatagramPacket(tempBuffer, tempBuffer.length, IPAddress, 9091);
+	                    DatagramPacket sendPacket = new DatagramPacket(tempBuffer, tempBuffer.length, IPAddress, 9093);
 	                    clientSocket.send(sendPacket);
-	                    byteOutputStream.write(tempBuffer, 0, cnt);
 	                }
 	            }
 	            byteOutputStream.close();
@@ -521,9 +514,74 @@ public class AgentClient extends Application {
 		}
 	}
 	
+	public class MulticastCaptureThread extends Thread {
+		private String IPAddress;
+		private byte tempBuffer[] = new byte[AudioFormatAndBufferSize.bufferSize];
+		
+		public MulticastCaptureThread(String IPAddress) {
+			super();
+			this.IPAddress = IPAddress;
+		}
+
+		@Override
+		public void run() {
+			stopAudioCapture = false;
+	        try {
+	        	MulticastSocket multicastSocket = new MulticastSocket(10002);
+	            InetAddress multicastgroupAddress = InetAddress.getByName(this.IPAddress);
+	            while (!stopAudioCapture) {
+	                int cnt = targetDataLine.read(tempBuffer, 0, tempBuffer.length);
+	                if (cnt > 0) {
+	                	DatagramPacket packet = new DatagramPacket(tempBuffer, tempBuffer.length, multicastgroupAddress, 9094);
+	                    multicastSocket.send(packet);
+	                }
+	            }
+	            byteOutputStream.close();
+	            multicastSocket.close();
+	        } catch (Exception e) {
+	            System.out.println("CaptureThread::run()" + e);
+	            System.exit(0);
+	        }
+		}
+	}	
+	
+	AudioInputStream InputStream;
+	SourceDataLine sourceLine;
+	
+	public class VOIPThread extends Thread {
+		public void run() {
+		    try {
+		        @SuppressWarnings("resource")
+				DatagramSocket serverSocket = new DatagramSocket(9092);
+		        byte[] receiveData = new byte[AudioFormatAndBufferSize.bufferSize];
+		        while (true) {
+		            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+		            serverSocket.receive(receivePacket);
+		            try {
+		                byte audioData[] = receivePacket.getData();
+		                InputStream byteInputStream = new ByteArrayInputStream(audioData);
+		                AudioFormat adFormat = AudioFormatAndBufferSize.getAudioFormat();
+		                InputStream = new AudioInputStream(byteInputStream, adFormat, audioData.length / adFormat.getFrameSize());
+		                DataLine.Info dataLineInfo = new DataLine.Info(SourceDataLine.class, adFormat);
+		                sourceLine = (SourceDataLine) AudioSystem.getLine(dataLineInfo);
+		                sourceLine.open(adFormat);
+		                sourceLine.start();
+		                Thread playThread = new PlayThread();
+		                playThread.start();
+		            } catch (Exception e) {
+		                System.out.println(e);
+		                System.exit(0);
+		            }
+		        }
+		    } catch (Exception e) {
+		        e.printStackTrace();
+		    }
+		}
+	}
+	
 	class PlayThread extends Thread {	
 	    byte tempBuffer[] = new byte[AudioFormatAndBufferSize.bufferSize];
-	
+	    
 	    public void run() {
 	        try {
 	            int cnt;
@@ -538,6 +596,4 @@ public class AgentClient extends Application {
 	        }
 	    }
 	}
-	
-	
 }

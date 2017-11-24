@@ -1,7 +1,6 @@
 package agentClient;
 
 import java.io.IOException;
-
 import javax.swing.JOptionPane;
 
 import agentClient.AgentClient;
@@ -13,6 +12,7 @@ public class AgentThread extends Thread {
 	public void run() {
 		try{
 			Thread.sleep(1000);
+			AgentClient.multicastIPAddress = AgentClient.rmiObject.getAgentMulticastAddress(AgentClient.username);
 			//While the agent has not decided to quit, and has not received word of being able to quit
 			while(AgentClient.wantsToQuit == false || AgentClient.canQuit == false){
 				if(AgentClient.fromServer.ready()){
@@ -43,6 +43,8 @@ public class AgentThread extends Thread {
 								Platform.runLater(()->{
 									AgentClient.customer1Label.setText("Connected Customer: " + AgentClient.customer1);
 									AgentClient.customer1Input.setDisable(false);
+									AgentClient.customer1VoiceChat.setDisable(false);
+									AgentClient.bothVoiceChat.setDisable(false);
 								});
 								JOptionPane.showMessageDialog(null, 
 										"A new customer has joined in.\nName: " + response[1], 
@@ -55,6 +57,8 @@ public class AgentThread extends Thread {
 								Platform.runLater(()->{
 									AgentClient.customer2Label.setText("Connected Customer: " + AgentClient.customer2);
 									AgentClient.customer2Input.setDisable(false);
+									AgentClient.customer2VoiceChat.setDisable(false);
+									AgentClient.bothVoiceChat.setDisable(false);
 								});
 								JOptionPane.showMessageDialog(null, 
 										"A new customer has joined in. Name: " + response[1], 
@@ -70,6 +74,7 @@ public class AgentThread extends Thread {
 									AgentClient.customer1Dialog.setText("");
 									AgentClient.customer1Label.setText("Connected Customer: ");
 									AgentClient.customer1Input.setDisable(true);
+									AgentClient.customer1VoiceChat.setDisable(true);
 								});
 								JOptionPane.showMessageDialog(null, 
 										"A customer has disconnected. Name: " + response[1], 
@@ -83,12 +88,17 @@ public class AgentThread extends Thread {
 									AgentClient.customer2Dialog.setText("");
 									AgentClient.customer2Label.setText("Connected Customer: ");
 									AgentClient.customer2Input.setDisable(true);
+									AgentClient.customer2VoiceChat.setDisable(true);
 								});
 								JOptionPane.showMessageDialog(null, 
 										"A customer has disconnected. Name: " + response[1], 
 										"Customer Disconnected", 
 										JOptionPane.INFORMATION_MESSAGE
 										);
+							}
+							
+							if(AgentClient.customer1 == null && AgentClient.customer2 == null){
+								AgentClient.bothVoiceChat.setDisable(true);
 							}
 						}
 					}
@@ -125,4 +135,5 @@ public class AgentThread extends Thread {
 		} catch (InterruptedException e) {
 		}
 	}
+	
 }

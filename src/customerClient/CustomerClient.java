@@ -122,6 +122,8 @@ public class CustomerClient extends Application {
 						System.exit(0);
 					}
 				}
+				stopAudioCapture = true;
+				targetDataLine.close();
 				fromServer.close();
 				toServer.close();
 				socket.close();
@@ -250,8 +252,6 @@ public class CustomerClient extends Application {
 	
 	ByteArrayOutputStream byteOutputStream;
 	TargetDataLine targetDataLine;
-	AudioInputStream InputStream;
-	SourceDataLine sourceLine;
 	public boolean stopAudioCapture = false;
 	
 	private void captureAudio(String customerIPAddress) {
@@ -270,35 +270,6 @@ public class CustomerClient extends Application {
 	    }
 	}
 	
-	public void runVOIP() {
-	    try {
-	        @SuppressWarnings("resource")
-			DatagramSocket serverSocket = new DatagramSocket(9091);
-	        byte[] receiveData = new byte[AudioFormatAndBufferSize.bufferSize];
-	        while (true) {
-	            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-	            serverSocket.receive(receivePacket);
-	            try {
-	                byte audioData[] = receivePacket.getData();
-	                InputStream byteInputStream = new ByteArrayInputStream(audioData);
-	                AudioFormat adFormat = AudioFormatAndBufferSize.getAudioFormat();
-	                InputStream = new AudioInputStream(byteInputStream, adFormat, audioData.length / adFormat.getFrameSize());
-	                DataLine.Info dataLineInfo = new DataLine.Info(SourceDataLine.class, adFormat);
-	                sourceLine = (SourceDataLine) AudioSystem.getLine(dataLineInfo);
-	                sourceLine.open(adFormat);
-	                sourceLine.start();
-	                Thread playThread = new Thread(new PlayThread());
-	                playThread.start();
-	            } catch (Exception e) {
-	                System.out.println(e);
-	                System.exit(0);
-	            }
-	        }
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
-	}
-	
 	public class CaptureThread extends Thread {
 		private String IPAddress;
 		private byte tempBuffer[] = new byte[AudioFormatAndBufferSize.bufferSize];
@@ -313,12 +284,12 @@ public class CustomerClient extends Application {
 			ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
 	        stopAudioCapture = false;
 	        try {
-	            DatagramSocket clientSocket = new DatagramSocket(9090);
+	            DatagramSocket clientSocket = new DatagramSocket(10001);
 	            InetAddress IPAddress = InetAddress.getByName(this.IPAddress);
 	            while (!stopAudioCapture) {
 	                int cnt = targetDataLine.read(tempBuffer, 0, tempBuffer.length);
 	                if (cnt > 0) {
-	                    DatagramPacket sendPacket = new DatagramPacket(tempBuffer, tempBuffer.length, IPAddress, 9091);
+	                    DatagramPacket sendPacket = new DatagramPacket(tempBuffer, tempBuffer.length, IPAddress, 9092);
 	                    clientSocket.send(sendPacket);
 	                    byteOutputStream.write(tempBuffer, 0, cnt);
 	                }
@@ -330,24 +301,6 @@ public class CustomerClient extends Application {
 	            System.exit(0);
 	        }
 		}
-	}
-	
-	class PlayThread extends Thread {	
-	    byte tempBuffer[] = new byte[AudioFormatAndBufferSize.bufferSize];
-	
-	    public void run() {
-	        try {
-	            int cnt;
-	            while ((cnt = InputStream.read(tempBuffer, 0, tempBuffer.length)) != -1) {
-	                if (cnt > 0) {
-	                    sourceLine.write(tempBuffer, 0, cnt);
-	                }
-	            }
-	        } catch (Exception e) {
-	            System.out.println(e);
-	            System.exit(0);
-	        }
-	    }
 	}
 
 }

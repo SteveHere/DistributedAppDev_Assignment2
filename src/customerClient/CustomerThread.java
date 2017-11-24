@@ -1,9 +1,21 @@
 package customerClient;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.MulticastSocket;
 
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.DataLine;
+import javax.sound.sampled.SourceDataLine;
 import javax.swing.JOptionPane;
 
+import common.AudioFormatAndBufferSize;
 import javafx.application.Platform;
 
 public class CustomerThread extends Thread {
@@ -12,6 +24,8 @@ public class CustomerThread extends Thread {
 	public void run() {
 		try{
 			boolean onlyShowOnce = true;
+			UnicastVOIPThread voip;
+			MulticastVOIPThread mvoip;
 			while(CustomerClient.agent == null && CustomerClient.wantsToQuit == false){
 				if(CustomerClient.fromServer.ready()){
 					String response = CustomerClient.fromServer.readLine();
@@ -33,6 +47,10 @@ public class CustomerThread extends Thread {
 							CustomerClient.clientText.setDisable(false);
 							CustomerClient.send.setDisable(false);
 						});
+						voip = new UnicastVOIPThread();
+						voip.start();
+						mvoip = new MulticastVOIPThread();
+						mvoip.start();
 						break;
 					}
 				}
@@ -118,5 +136,91 @@ public class CustomerThread extends Thread {
 		}
 		System.exit(0);
 	}
-
+	
+	AudioInputStream InputStream;
+	SourceDataLine sourceLine;
+	
+	class UnicastVOIPThread extends Thread {	
+		public void run() {
+		    try {
+		        @SuppressWarnings("resource")
+				DatagramSocket serverSocket = new DatagramSocket(9093);
+		        byte[] receiveData = new byte[AudioFormatAndBufferSize.bufferSize];
+		        while (true) {
+		            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+		            serverSocket.receive(receivePacket);
+		            try {
+		                byte audioData[] = receivePacket.getData();
+		                InputStream byteInputStream = new ByteArrayInputStream(audioData);
+		                AudioFormat adFormat = AudioFormatAndBufferSize.getAudioFormat();
+		                InputStream = new AudioInputStream(byteInputStream, adFormat, audioData.length / adFormat.getFrameSize());
+		                DataLine.Info dataLineInfo = new DataLine.Info(SourceDataLine.class, adFormat);
+		                sourceLine = (SourceDataLine) AudioSystem.getLine(dataLineInfo);
+		                sourceLine.open(adFormat);
+		                sourceLine.start();
+		                Thread playThread = new PlayThread();
+		                playThread.start();
+		            } catch (Exception e) {
+		                System.out.println(e);
+		                System.exit(0);
+		            }
+		        }
+		    } catch (Exception e) {
+		        e.printStackTrace();
+		    }
+		}
+	}
+	
+	class MulticastVOIPThread extends Thread {	
+		public void run() {
+		    try {
+		    	@SuppressWarnings("resource")
+				MulticastSocket mcSocket = new MulticastSocket(9094);   
+		    	String multicastAddress = CustomerClient.rmiObject.getAgentMulticastAddress(CustomerClient.agent);
+		    	InetAddress multicastgroupAddress = InetAddress.getByName(multicastAddress);
+	            mcSocket.joinGroup(multicastgroupAddress);
+	            byte[] audioData = new byte[AudioFormatAndBufferSize.bufferSize];
+		        while (true) {
+		        	DatagramPacket packet = new DatagramPacket(audioData, audioData.length);
+		            mcSocket.receive(packet);
+	
+		            try {
+		            	InputStream byteInputStream = new ByteArrayInputStream(audioData);
+		                AudioFormat adFormat = AudioFormatAndBufferSize.getAudioFormat();
+		                InputStream = new AudioInputStream(byteInputStream, adFormat, audioData.length / adFormat.getFrameSize());
+		                DataLine.Info dataLineInfo = new DataLine.Info(SourceDataLine.class, adFormat);
+		                sourceLine = (SourceDataLine) AudioSystem.getLine(dataLineInfo);
+		                sourceLine.open(adFormat);
+		                sourceLine.start();
+		                Thread playThread = new PlayThread();
+		                playThread.start();
+		            } catch (Exception e) {
+		                System.out.println(e);
+		                System.exit(0);
+		            }
+		        }
+		    } catch (Exception e) {
+		        e.printStackTrace();
+		    }
+		}
+	}
+	
+	
+	class PlayThread extends Thread {	
+	    byte tempBuffer[] = new byte[AudioFormatAndBufferSize.bufferSize];
+	
+	    public void run() {
+	        try {
+	            int cnt;
+	            while ((cnt = InputStream.read(tempBuffer, 0, tempBuffer.length)) != -1) {
+	                if (cnt > 0) {
+	                    sourceLine.write(tempBuffer, 0, cnt);
+	                }
+	            }
+	        } catch (Exception e) {
+	            System.out.println(e);
+	            System.exit(0);
+	        }
+	    }
+	}
 }

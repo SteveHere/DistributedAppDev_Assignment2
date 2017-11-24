@@ -86,7 +86,7 @@ public class SharedImplementation extends UnicastRemoteObject implements SharedI
 						+ "." + (1 + r.nextInt(255)) 
 						+ "." + (1 + r.nextInt(255));
 			}while(Server.agentToMultiCastIP.containsValue(address));
-			
+			Server.agentToMultiCastIP.put(agent, address);
 			return address;
 		}
 		else{
