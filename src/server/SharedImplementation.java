@@ -81,10 +81,10 @@ public class SharedImplementation extends UnicastRemoteObject implements SharedI
 			String address = "";
 			do{
 				Random r = new Random();
-				address = (224 + r.nextInt(15)) 
-						+ "." + (1 + r.nextInt(255))
-						+ "." + (1 + r.nextInt(255)) 
-						+ "." + (1 + r.nextInt(255));
+				address = (224 + r.nextInt(10)) 
+						+ "." + (1 + r.nextInt(250))
+						+ "." + (1 + r.nextInt(250)) 
+						+ "." + (1 + r.nextInt(250));
 			}while(Server.agentToMultiCastIP.containsValue(address));
 			Server.agentToMultiCastIP.put(agent, address);
 			return address;

@@ -203,8 +203,29 @@ public class RequestHandler extends Thread {
 			String response = fromClient.readLine();
 			if(response != null){
 				if(response.equals("Quit") || response.equals("Force quit")){
-					Server.waitingCustomers.remove(username);
+					if(Server.waitingCustomers.contains(username)){
+						Server.waitingCustomers.remove(username);
+					}
 					Server.customerThreads.remove(username);
+					for(Pair<String, String> v : Server.agentToCustomer.values()){
+						if(v.getLeft().equals(username) || v.getRight().equals(username)){
+							for(String k : Server.agentToCustomer.keySet()){
+								Pair<String, String> p = Server.agentToCustomer.get(k);
+								if(p.getLeft().equals(username) || p.getRight().equals(username)){
+									Server.agentThreads.get(k).toClient.println("Remove~" + username);
+									Pair<String, String> temp = Server.agentToCustomer.get(k);
+									if(temp.getLeft().equals(username)){
+										Server.agentToCustomer.put(k, new Pair<String, String>(temp.getRight(), null));
+									}
+									else if(temp.getRight().equals(username)){
+										Server.agentToCustomer.put(k, new Pair<String, String>(temp.getLeft(), null));
+									}
+									break;
+								}
+							}
+							break;
+						}
+					}
 					customerQuit= true;
 					break;
 				}

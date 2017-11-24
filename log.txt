@@ -61,3 +61,35 @@ java.net.SocketException: Connection reset
 1511532652 Client from 127.0.0.1 connected
 1511532679 Client from 127.0.0.1 connected
 1511532724 Client from 127.0.0.1 disconnected
+1511541785 Client from 127.0.0.1 connected
+1511541809 Client from 127.0.0.1 connected
+1511541938 Client from 127.0.0.1 disconnected
+1511541968 Client from 127.0.0.1 connected
+1511541968 Client from 127.0.0.1 disconnected
+1511542029 Client from 127.0.0.1 connected
+1511542043 Client from 127.0.0.1 connected
+1511542213: Exception occured while connecting with 127.0.0.1
+java.net.SocketException: Connection reset
+1511542213 Client from 127.0.0.1 disconnected
+1511542232 Client from 127.0.0.1 connected
+1511542243 Client from 127.0.0.1 connected
+1511542424 Client from 127.0.0.1 connected
+1511542435 Client from 127.0.0.1 connected
+1511542467 Client from 127.0.0.1 disconnected
+1511542617 Client from 127.0.0.1 connected
+1511542629 Client from 127.0.0.1 connected
+1511542723 Client from 127.0.0.1 disconnected
+1511542742 Client from 127.0.0.1 connected
+1511542790 Client from 127.0.0.1 disconnected
+1511542802 Client from 127.0.0.1 disconnected
+1511542899 Client from 127.0.0.1 connected
+1511542910 Client from 127.0.0.1 connected
+1511542963 Client from 127.0.0.1 disconnected
+1511542984 Client from 127.0.0.1 connected
+1511543749: Exception occured while connecting with 127.0.0.1
+java.net.SocketException: Connection reset
+1511543749 Client from 127.0.0.1 disconnected
+1511543773 Client from 127.0.0.1 connected
+1511543788 Client from 127.0.0.1 connected
+1511543895 Client from 127.0.0.1 disconnected
+1511543900 Client from 127.0.0.1 disconnected

@@ -447,7 +447,6 @@ public class AgentClient extends Application {
 		}
 	}
 
-	ByteArrayOutputStream byteOutputStream;
 	TargetDataLine targetDataLine;
 	public boolean stopAudioCapture = false;
 	
@@ -478,7 +477,7 @@ public class AgentClient extends Application {
 	        Thread captureThread = new MulticastCaptureThread(multicastIPAddress);
 	        captureThread.start();
 	    } catch (Exception e) {
-	        System.err.println(e.getMessage());
+	        e.printStackTrace();
 	        System.exit(0);
 	    }
 	}
@@ -505,10 +504,9 @@ public class AgentClient extends Application {
 	                    clientSocket.send(sendPacket);
 	                }
 	            }
-	            byteOutputStream.close();
 	            clientSocket.close();
 	        } catch (Exception e) {
-	            System.out.println("CaptureThread::run()" + e);
+	            System.err.println(e.getMessage());
 	            System.exit(0);
 	        }
 		}
@@ -536,10 +534,9 @@ public class AgentClient extends Application {
 	                    multicastSocket.send(packet);
 	                }
 	            }
-	            byteOutputStream.close();
 	            multicastSocket.close();
 	        } catch (Exception e) {
-	            System.out.println("CaptureThread::run()" + e);
+	        	e.printStackTrace();
 	            System.exit(0);
 	        }
 		}
